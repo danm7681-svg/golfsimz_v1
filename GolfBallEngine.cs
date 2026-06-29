@@ -28,17 +28,20 @@ namespace golfsimz_v1
         public List<TrajectoryPoint> SimulateShot(float speedMph, float launchDeg, float sideDeg, float backspinRpm, float sidespinRpm)
         {
             var path = new List<TrajectoryPoint>();
-            float v0 = speedMph * 0.44704f;
+            float v0 = speedMph * 0.44704f; // Convert mph to m/s
             float theta = launchDeg * (float)(Math.PI / 180.0f);
             float phi = sideDeg * (float)(Math.PI / 180.0f);
 
             float x = 0, y = 0, z = 0;
+            // Coordinate System: X = Left/Right, Y = Vertical Altitude, Z = Downrange Forward
             float vx = v0 * (float)(Math.Cos(theta) * Math.Sin(phi));
             float vy = v0 * (float)Math.Sin(theta);
             float vz = v0 * (float)(Math.Cos(theta) * Math.Cos(phi));
 
             float omegaTotalRpm = (float)Math.Sqrt(backspinRpm * backspinRpm + sidespinRpm * sidespinRpm);
             float omegaTotal = (omegaTotalRpm * 2.0f * (float)Math.PI) / 60.0f;
+            
+            // Evaluates spin direction tilt vector
             float spinAxisTilt = (float)Math.Atan2(sidespinRpm, backspinRpm);
 
             float currentTime = 0.0f;
@@ -52,61 +55,76 @@ namespace golfsimz_v1
                 float vMag = (float)Math.Sqrt(vx*vx + vy*vy + vz*vz);
                 if (vMag < 0.1f) break;
 
+                // Dimensionless spin parameters
                 float spinRatio = (Radius * omegaTotal) / vMag;
+                
+                // Lift Coefficient
                 float cl = spinRatio < 0.1f ? 1.8f * spinRatio : 0.14f + 0.4f * (spinRatio - 0.1f);
-                cl = Math.Min(cl, 0.38f);
+                cl = Math.Min(cl, 0.45f);
 
+                // Drag Coefficient
                 float cd = 0.22f + 0.35f * spinRatio + 0.28f * (spinRatio * spinRatio);
-                cd = Math.Min(cd, 0.65f);
+                cd = Math.Min(cd, 0.60f);
 
                 float dragMag = 0.5f * AirDensity * Area * cd * (vMag * vMag);
                 float liftMag = 0.5f * AirDensity * Area * cl * (vMag * vMag);
 
+                // Drag Vector components (Opposite of travel velocity)
                 float fdx = -dragMag * (vx / vMag);
                 float fdy = -dragMag * (vy / vMag);
                 float fdz = -dragMag * (vz / vMag);
 
+                // Lift Vector components via clear cross-product mechanics (Magnus Effect)
                 float flx = 0, fly = 0, flz = 0;
                 if (omegaTotal > 0.0f)
                 {
-                    float hlx = -vz; float hlz = vx;
-                    float hlMag = (float)Math.Sqrt(hlx*hlx + hlz*hlz);
-                    if (hlMag > 0.001f) { hlx /= hlMag; hlz /= hlMag; }
+                    // Spin orientation vectors mapped explicitly to flight path
+                    float sx = (float)Math.Sin(spinAxisTilt);
+                    float sy = 0;
+                    float sz = -(float)Math.Cos(spinAxisTilt);
 
-                    float hly = 0;
-                    float uux = (vy * hlz) - (vz * hly);
-                    float uuy = (vz * hlx) - (vx * hlz);
-                    float uuz = (vx * hly) - (vy * hlx);
-                    float uuMag = (float)Math.Sqrt(uux*uux + uuy*uuy + uuz*uuz);
-                    if (uuMag > 0.001f) { uux /= uuMag; uuy /= uuMag; uuz /= uuMag; }
+                    // Cross product: Velocity vector x Spin axis vector
+                    float cx = (vy * sz) - (vz * sy);
+                    float cy = (vz * sx) - (vx * sz);
+                    float cz = (vx * sy) - (vy * sx);
 
-                    float ldx = (uux * (float)Math.Cos(spinAxisTilt)) + (hlx * (float)Math.Sin(spinAxisTilt));
-                    float ldy = (uuy * (float)Math.Cos(spinAxisTilt)) + (hly * (float)Math.Sin(spinAxisTilt));
-                    float ldz = (uuz * (float)Math.Cos(spinAxisTilt)) + (hlz * (float)Math.Sin(spinAxisTilt));
-
-                    flx = ldx * liftMag; fly = ldy * liftMag; flz = ldz * liftMag;
+                    float cMag = (float)Math.Sqrt(cx*cx + cy*cy + cz*cz);
+                    if (cMag > 0.001f)
+                    {
+                        flx = (cx / cMag) * liftMag;
+                        fly = (cy / cMag) * liftMag;
+                        flz = (cz / cMag) * liftMag;
+                    }
                 }
 
+                // Force to Acceleration conversions
                 float ax = (fdx + flx) / Mass;
                 float ay = ((fdy + fly) / Mass) - Gravity;
                 float az = (fdz + flz) / Mass;
 
                 lastX = x; lastY = y; lastZ = z; lastTime = currentTime;
 
+                // Standard Euler-Cromer physics execution
                 vx += ax * TimeStepDt; vy += ay * TimeStepDt; vz += az * TimeStepDt;
                 x += vx * TimeStepDt; y += vy * TimeStepDt; z += vz * TimeStepDt;
                 currentTime += TimeStepDt;
                 stepCount++;
 
-                float currentAlt = y * 3.28084f;
+                float currentAlt = y * 3.28084f; // Meters to Feet
                 if (currentAlt > ApexHeightFt) ApexHeightFt = currentAlt;
 
                 if (stepCount % 30 == 0 && y >= 0.0f)
                 {
-                    path.Add(new TrajectoryPoint { Time = currentTime, DownrangeYds = z * 1.09361f, AltitudeFt = Math.Max(0, currentAlt), OfflineYds = x * 1.09361f });
+                    path.Add(new TrajectoryPoint { 
+                        Time = currentTime, 
+                        DownrangeYds = z * 1.09361f, // Meters to Yards
+                        AltitudeFt = Math.Max(0, currentAlt), 
+                        OfflineYds = x * 1.09361f 
+                    });
                 }
             }
 
+            // Accurate ground-strike linear interpolation logic
             if (lastY > 0.0f && y < 0.0f)
             {
                 float frac = lastY / (lastY - y);
