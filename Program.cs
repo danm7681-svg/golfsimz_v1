@@ -1,3 +1,4 @@
+using golfsimz_v1.Pages;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using System;
