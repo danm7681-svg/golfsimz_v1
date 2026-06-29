@@ -15,53 +15,44 @@ public List<TrajectoryPoint> SimulateShot(float speedMph, float launchDeg, float
 
     float currentTime = 0.0f;
     ApexHeightFt = 0.0f;
-    int stepCount = 0;
+
+    // Physics constants tuned for 7-iron trajectory
+    float dragCoef = 0.22f; 
+    float liftCoefBase = 0.35f;
 
     while (y >= 0.0f && currentTime < 15.0f)
     {
         float vMag = (float)Math.Sqrt(vx * vx + vy * vy + vz * vz);
         if (vMag < 0.1f) break;
 
-        // Optimized Coefficients for realistic ball flight
         float spinRatio = (Radius * omegaTotal) / vMag;
-        float cl = 0.5f * spinRatio; // Increased lift sensitivity
-        float cd = 0.25f + 0.15f * spinRatio; // Reduced drag
+        
+        // Tuned coefficients: lower drag, higher lift
+        float cl = liftCoefBase * (1.0f + 0.5f * spinRatio);
+        float cd = dragCoef * (1.0f + 0.2f * spinRatio);
 
         float dragMag = 0.5f * AirDensity * Area * cd * (vMag * vMag);
         float liftMag = 0.5f * AirDensity * Area * cl * (vMag * vMag);
 
-        // Vector math
-        float fdx = -dragMag * (vx / vMag);
-        float fdy = -dragMag * (vy / vMag);
-        float fdz = -dragMag * (vz / vMag);
+        // Calculate Accelerations
+        float ax = (-dragMag * (vx / vMag)) / Mass;
+        float ay = ((-dragMag * (vy / vMag)) / Mass) - Gravity + (liftMag / Mass); // Adding lift directly to Y
+        float az = (-dragMag * (vz / vMag)) / Mass;
 
-        float flx = 0, fly = 0, flz = 0;
-        if (omegaTotal > 0.0f)
-        {
-            float sx = (float)Math.Sin(spinAxisTilt);
-            float sz = -(float)Math.Cos(spinAxisTilt);
-            // Cross Product of Velocity and Spin Axis
-            flx = ((vy * sz) - (vz * 0)) * (liftMag / vMag);
-            fly = ((vz * sx) - (vx * sz)) * (liftMag / vMag);
-            flz = ((vx * 0) - (vy * sx)) * (liftMag / vMag);
-        }
-
-        vx += ((fdx + flx) / Mass) * TimeStepDt;
-        vy += (((fdy + fly) / Mass) - Gravity) * TimeStepDt;
-        vz += ((fdz + flz) / Mass) * TimeStepDt;
+        vx += ax * TimeStepDt;
+        vy += ay * TimeStepDt;
+        vz += az * TimeStepDt;
 
         x += vx * TimeStepDt;
         y += vy * TimeStepDt;
         z += vz * TimeStepDt;
         currentTime += TimeStepDt;
 
-        if (stepCount++ % 30 == 0)
+        if (currentTime % 0.03f < 0.001f) // Log every ~30ms
         {
             path.Add(new TrajectoryPoint { Time = currentTime, DownrangeYds = z * 1.09361f, AltitudeFt = y * 3.28084f, OfflineYds = x * 1.09361f });
         }
         if (y * 3.28084f > ApexHeightFt) ApexHeightFt = y * 3.28084f;
     }
-    
-    // Final logic for landing (Keep your existing landing interpolation)
     return path;
 }
