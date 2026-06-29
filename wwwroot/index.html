@@ -25,8 +25,8 @@
             if (!canvas) return;
             
             scene = new THREE.Scene();
-            // Deep sky night mix background color
-            scene.background = new THREE.Color(0x0a0f1d);
+            // Deep sky background color
+            scene.background = new THREE.Color(0x0a141d);
             
             camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
             camera.position.set(0, 12, -35);
@@ -35,83 +35,53 @@
             renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
             
-            // 1. FIXED GRASS FIELD (Using MeshBasicMaterial so color always shows up)
-            const grassGeo = new THREE.PlaneGeometry(600, 800);
-            const grassMat = new THREE.MeshBasicMaterial({ 
-                color: 0x143316, // Rich Deep Fairway Green 
-                side: THREE.DoubleSide 
-            });
+            // 1. THE BIG GREEN GRASS FLOOR (Flat unlit material, guaranteed to show)
+            const grassGeo = new THREE.PlaneGeometry(800, 1000);
+            const grassMat = new THREE.MeshBasicMaterial({ color: 0x1b431e });
             const grassField = new THREE.Mesh(grassGeo, grassMat);
-            grassField.rotation.x = -Math.PI / 2; // Flatten it completely
-            grassField.position.set(0, -0.2, 200); // Sit it safely below grid lines
+            grassField.rotation.x = -Math.PI / 2; // Flat on the floor
+            grassField.position.set(0, -0.5, 250);
             scene.add(grassField);
 
-            // Grid Fairway Overlay Lines
-            const gridHelper = new THREE.GridHelper(500, 50, 0x225427, 0x1b421f);
-            gridHelper.position.set(0, -0.1, 200);
+            // 2. RANGE GRID LINES
+            const gridHelper = new THREE.GridHelper(600, 60, 0x33663bb, 0x274d2d);
+            gridHelper.position.set(0, -0.4, 250);
             scene.add(gridHelper);
 
-            // ENVIRONMENT LIGHTING (Brings out 3D tree shapes)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambientLight);
-            
-            const sunLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            sunLight.position.set(0, 50, 50);
-            scene.add(sunLight);
+            // 3. GENERATE THE BACKDROP TREES
+            // Simple loop placing flat-colored primitive trees down the sides and back
+            const trunkMat = new THREE.MeshBasicMaterial({ color: 0x422811 });
+            const leavesMat = new THREE.MeshBasicMaterial({ color: 0x113315 });
 
-            // 2. GENERATE FOREST BACKDROP
-            createDenseForest();
+            // Back Row Woods (at 280 yards deep)
+            for (let x = -120; x <= 120; x += 15) {
+                createSingleTree(x, 280, trunkMat, leavesMat);
+                // Extra layer of depth behind them
+                createSingleTree(x + 7, 295, trunkMat, leavesMat);
+            }
+
+            // Side Boundary Tree Lines
+            for (let z = 60; z < 260; z += 40) {
+                createSingleTree(-75, z, trunkMat, leavesMat); // Left boundary
+                createSingleTree(75, z, trunkMat, leavesMat);  // Right boundary
+            }
             
             renderer.render(scene, camera);
         };
 
-        // 3D Tree Builder
-        function buildTree(x, z) {
-            const treeGroup = new THREE.Group();
-            const heightScale = 0.85 + Math.random() * 0.4;
-
-            // Trunk Structure
-            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 6 * heightScale, 5);
-            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a3319 }); 
+        // Simplified Tree Assembler
+        function createSingleTree(x, z, trunkMat, leavesMat) {
+            // Trunk cylinder
+            const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 6, 4);
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.y = (6 * heightScale) / 2;
-            treeGroup.add(trunk);
+            trunk.position.set(x, 3, z);
+            scene.add(trunk);
 
-            // Layered Canopy Foliage (Stacked Pines)
-            const leafMat = new THREE.MeshLambertMaterial({ color: 0x0f2e14 }); 
-            
-            const layers = 3;
-            for(let i = 0; i < layers; i++) {
-                const radius = 4.0 - (i * 1.1);
-                const height = 5.0 - (i * 0.6);
-                const coneGeo = new THREE.ConeGeometry(radius, height, 5);
-                const cone = new THREE.Mesh(coneGeo, leafMat);
-                
-                cone.position.y = (5 * heightScale) + (i * 2.8 * heightScale);
-                treeGroup.add(cone);
-            }
-
-            treeGroup.position.set(x, 0, z);
-            scene.add(treeGroup);
-        }
-
-        function createDenseForest() {
-            // Back wall backdrop trees (at 280-340 yards out)
-            for (let x = -150; x <= 150; x += 14) {
-                let randX = x + (Math.random() - 0.5) * 6;
-                let randZ = 290 + (Math.random() - 0.5) * 10;
-                buildTree(randX, randZ);
-
-                if (Math.random() > 0.2) {
-                    buildTree(randX + 7, randZ + 18);
-                }
-            }
-
-            // Flanking Side boundary border lines
-            for (let z = 60; z < 280; z += 30) {
-                buildTree(-80 + (Math.random() - 0.5) * 8, z); // Left border
-                buildTree(80 + (Math.random() - 0.5) * 8, z);  // Right border
-            }
+            // Foliage cone
+            const coneGeo = new THREE.ConeGeometry(4, 9, 4);
+            const leaves = new THREE.Mesh(coneGeo, leavesMat);
+            leaves.position.set(x, 9, z);
+            scene.add(leaves);
         }
 
         window.update3DTracer = (pointsJson) => {
