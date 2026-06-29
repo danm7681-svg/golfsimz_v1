@@ -35,52 +35,61 @@
             renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
             
-            // 1. THE BIG GREEN GRASS FLOOR (Flat unlit material, guaranteed to show)
+            // 1. ADD THE GRASS FLOOR
             const grassGeo = new THREE.PlaneGeometry(800, 1000);
-            const grassMat = new THREE.MeshBasicMaterial({ color: 0x1b431e });
+            const grassMat = new THREE.MeshLambertMaterial({ color: 0x1b431e }); // Reacts beautifully to our new sun light
             const grassField = new THREE.Mesh(grassGeo, grassMat);
-            grassField.rotation.x = -Math.PI / 2; // Flat on the floor
+            grassField.rotation.x = -Math.PI / 2; 
             grassField.position.set(0, -0.5, 250);
             scene.add(grassField);
 
-            // 2. RANGE GRID LINES
-            const gridHelper = new THREE.GridHelper(600, 60, 0x33663bb, 0x274d2d);
+            // 2. RANGE GRID LINES (Typo fixed here!)
+            const gridHelper = new THREE.GridHelper(600, 60, 0x33663b, 0x274d2d);
             gridHelper.position.set(0, -0.4, 250);
             scene.add(gridHelper);
 
-            // 3. GENERATE THE BACKDROP TREES
-            // Simple loop placing flat-colored primitive trees down the sides and back
-            const trunkMat = new THREE.MeshBasicMaterial({ color: 0x422811 });
-            const leavesMat = new THREE.MeshBasicMaterial({ color: 0x113315 });
+            // 3. THE SUN LIGHTING SYSTEM
+            // Ambient light makes sure everything isn't pitch black in the shadows
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            // The Sun directional light casting shadows down the range
+            const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            sunLight.position.set(40, 80, -20); // Positioned high and slightly behind the golfer
+            scene.add(sunLight);
+
+            // 4. GENERATE THE BACKDROP TREES
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x422811 });
+            const leavesMat = new THREE.MeshLambertMaterial({ color: 0x113315 });
 
             // Back Row Woods (at 280 yards deep)
             for (let x = -120; x <= 120; x += 15) {
                 createSingleTree(x, 280, trunkMat, leavesMat);
-                // Extra layer of depth behind them
                 createSingleTree(x + 7, 295, trunkMat, leavesMat);
             }
 
             // Side Boundary Tree Lines
             for (let z = 60; z < 260; z += 40) {
-                createSingleTree(-75, z, trunkMat, leavesMat); // Left boundary
-                createSingleTree(75, z, trunkMat, leavesMat);  // Right boundary
+                createSingleTree(-75, z, trunkMat, leavesMat); // Left side
+                createSingleTree(75, z, trunkMat, leavesMat);  // Right side
             }
             
             renderer.render(scene, camera);
         };
 
-        // Simplified Tree Assembler
         function createSingleTree(x, z, trunkMat, leavesMat) {
+            const heightScale = 0.8 + Math.random() * 0.4; // Adds natural height variations
+
             // Trunk cylinder
-            const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 6, 4);
+            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.4, 6 * heightScale, 5);
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.set(x, 3, z);
+            trunk.position.set(x, (6 * heightScale) / 2, z);
             scene.add(trunk);
 
             // Foliage cone
-            const coneGeo = new THREE.ConeGeometry(4, 9, 4);
+            const coneGeo = new THREE.ConeGeometry(4, 9 * heightScale, 5);
             const leaves = new THREE.Mesh(coneGeo, leavesMat);
-            leaves.position.set(x, 9, z);
+            leaves.position.set(x, (6 * heightScale) + ((9 * heightScale) / 2), z);
             scene.add(leaves);
         }
 
