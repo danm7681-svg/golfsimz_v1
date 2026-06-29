@@ -25,7 +25,7 @@
             if (!canvas) return;
             
             scene = new THREE.Scene();
-            // Deep sky blue/dark evening mix
+            // Deep sky night mix background color
             scene.background = new THREE.Color(0x0a0f1d);
             
             camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
@@ -35,29 +35,28 @@
             renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
             
-            // 1. ADD THE GRASS FIELD
-            // Creates a massive horizontal plane to act as the grass turf flooring
-            const grassGeo = new THREE.PlaneGeometry(300, 600);
-            const grassMat = new THREE.MeshLambertMaterial({ 
-                color: 0x1e3f20, // Premium Fairway Green
+            // 1. FIXED GRASS FIELD (Using MeshBasicMaterial so color always shows up)
+            const grassGeo = new THREE.PlaneGeometry(600, 800);
+            const grassMat = new THREE.MeshBasicMaterial({ 
+                color: 0x143316, // Rich Deep Fairway Green 
                 side: THREE.DoubleSide 
             });
             const grassField = new THREE.Mesh(grassGeo, grassMat);
-            grassField.rotation.x = -Math.PI / 2; // Lay it flat down
-            grassField.position.set(0, -0.05, 250); // Slightly below the grid lines to prevent glitching
+            grassField.rotation.x = -Math.PI / 2; // Flatten it completely
+            grassField.position.set(0, -0.2, 200); // Sit it safely below grid lines
             scene.add(grassField);
 
-            // Grid Fairway Overlay Lines (for targeting depth)
-            const gridHelper = new THREE.GridHelper(400, 40, 0x335c3a, 0x224427);
-            gridHelper.position.set(0, 0, 200);
+            // Grid Fairway Overlay Lines
+            const gridHelper = new THREE.GridHelper(500, 50, 0x225427, 0x1b421f);
+            gridHelper.position.set(0, -0.1, 200);
             scene.add(gridHelper);
 
-            // ENVIRONMENT LIGHTING (Brings out 3D textures/shadows)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            // ENVIRONMENT LIGHTING (Brings out 3D tree shapes)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
             
             const sunLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            sunLight.position.set(40, 60, -20);
+            sunLight.position.set(0, 50, 50);
             scene.add(sunLight);
 
             // 2. GENERATE FOREST BACKDROP
@@ -66,32 +65,29 @@
             renderer.render(scene, camera);
         };
 
-        // Realistic Procedural 3D Tree Builder
+        // 3D Tree Builder
         function buildTree(x, z) {
             const treeGroup = new THREE.Group();
-
-            // Varying scale so every tree looks custom and unique
             const heightScale = 0.85 + Math.random() * 0.4;
 
             // Trunk Structure
-            const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 6 * heightScale, 6);
-            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a3319 }); // Bark Brown
+            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 6 * heightScale, 5);
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a3319 }); 
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
             trunk.position.y = (6 * heightScale) / 2;
             treeGroup.add(trunk);
 
-            // Layered Canopy Foliage (Pine Tree Style)
-            const leafMat = new THREE.MeshLambertMaterial({ color: 0x1b4d22 }); // Forest Green
+            // Layered Canopy Foliage (Stacked Pines)
+            const leafMat = new THREE.MeshLambertMaterial({ color: 0x0f2e14 }); 
             
             const layers = 3;
             for(let i = 0; i < layers; i++) {
-                const radius = 3.5 - (i * 0.9);
-                const height = 4.5 - (i * 0.5);
-                const coneGeo = new THREE.ConeGeometry(radius, height, 6);
+                const radius = 4.0 - (i * 1.1);
+                const height = 5.0 - (i * 0.6);
+                const coneGeo = new THREE.ConeGeometry(radius, height, 5);
                 const cone = new THREE.Mesh(coneGeo, leafMat);
                 
-                // Stack each green canopy layer sequentially up the trunk
-                cone.position.y = (5 * heightScale) + (i * 2.5 * heightScale);
+                cone.position.y = (5 * heightScale) + (i * 2.8 * heightScale);
                 treeGroup.add(cone);
             }
 
@@ -100,24 +96,21 @@
         }
 
         function createDenseForest() {
-            // Plant a deep wall of trees along the back boundary (260 - 320 yards deep)
-            // Left to Right row
-            for (let x = -100; x <= 100; x += 10) {
-                // Row 1 (Main Backdrop Line)
-                let randX = x + (Math.random() - 0.5) * 5;
-                let randZ = 270 + (Math.random() - 0.5) * 8;
+            // Back wall backdrop trees (at 280-340 yards out)
+            for (let x = -150; x <= 150; x += 14) {
+                let randX = x + (Math.random() - 0.5) * 6;
+                let randZ = 290 + (Math.random() - 0.5) * 10;
                 buildTree(randX, randZ);
 
-                // Row 2 (Denser Rear Filling row to block out the horizon completely)
-                if (Math.random() > 0.3) {
-                    buildTree(randX + 5, randZ + 15);
+                if (Math.random() > 0.2) {
+                    buildTree(randX + 7, randZ + 18);
                 }
             }
 
-            // Plant Side Boundary Trees (Flanking Left and Right options down the driving range)
-            for (let z = 100; z < 260; z += 25) {
-                buildTree(-65 + (Math.random() - 0.5) * 6, z); // Left Tree line
-                buildTree(65 + (Math.random() - 0.5) * 6, z);  // Right Tree line
+            // Flanking Side boundary border lines
+            for (let z = 60; z < 280; z += 30) {
+                buildTree(-80 + (Math.random() - 0.5) * 8, z); // Left border
+                buildTree(80 + (Math.random() - 0.5) * 8, z);  // Right border
             }
         }
 
@@ -133,7 +126,7 @@
             });
             
             const geometry = new THREE.BufferGeometry().setFromPoints(threePoints);
-            const material = new THREE.LineBasicMaterial({ color: 0xff8c00, linewidth: 5 }); // Vibrant Trackman Orange Tracer
+            const material = new THREE.LineBasicMaterial({ color: 0xff8c00, linewidth: 6 }); 
             
             line = new THREE.Line(geometry, material);
             scene.add(line);
