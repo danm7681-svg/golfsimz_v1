@@ -1,0 +1,96 @@
+@page "/"
+@namespace golfsimz_v1
+@inject IJSRuntime JSRuntime
+
+<div style="background-color: #111; color: #fff; font-family: sans-serif; min-height: 100vh; display: flex; flex-direction: column;">
+    
+    <div style="flex: 1; position: relative; min-height: 480px; background: #111;">
+        <canvas id="canvas3d" style="width: 100%; height: 100%; display: block;"></canvas>
+        
+        <div style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); width: 250px; backdrop-filter: blur(6px); z-index: 10;">
+            <h3 style="margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; color: #aaa; letter-spacing: 1px;">Live Telemetry</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between;"><span style="color: #aaa;">Carry</span><strong style="color: #ff8c00; font-size: 16px;">@CarryDistanceYds.ToString("F1") yds</strong></div>
+                <div style="display: flex; justify-content: space-between;"><span style="color: #aaa;">Apex</span><strong>@ApexHeightFt.ToString("F0") ft</strong></div>
+                <div style="display: flex; justify-content: space-between;"><span style="color: #aaa;">Hang Time</span><strong>@TotalHangTime.ToString("F1") s</strong></div>
+                <div style="display: flex; justify-content: space-between;"><span style="color: #aaa;">Offline</span><strong style="color: @(OfflineYds < 0 ? "#ff4444" : "#44ff44");">@Math.Abs(OfflineYds).ToString("F1") @(OfflineYds < 0 ? "L" : "R")</strong></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button @onclick="CalculateFlight" style="flex: 1; background: #ff8c00; border: 0; padding: 10px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">Fire Shot</button>
+                <button @onclick="ResetSession" style="background: #333; border: 0; padding: 10px; border-radius: 4px; color: white; cursor: pointer; font-size: 12px;">RESET</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="background: #181818; padding: 20px; border-top: 2px solid #282828; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px;">
+        <div>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: bold;">BALL SPEED (MPH)</label>
+            <input type="range" min="40" max="200" step="1" @bind="BallSpeed" @bind:event="oninput" style="width: 100%; accent-color: #ff8c00;" />
+            <div style="text-align: right; font-weight: bold; margin-top: 3px; font-size: 14px;">@BallSpeed</div>
+        </div>
+        <div>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: bold;">LAUNCH ANGLE (°)</label>
+            <input type="range" min="5" max="50" step="0.5" @bind="LaunchAngle" @bind:event="oninput" style="width: 100%; accent-color: #ff8c00;" />
+            <div style="text-align: right; font-weight: bold; margin-top: 3px; font-size: 14px;">@LaunchAngle°</div>
+        </div>
+        <div>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: bold;">BACKSPIN (RPM)</label>
+            <input type="range" min="1000" max="12000" step="100" @bind="Backspin" @bind:event="oninput" style="width: 100%; accent-color: #ff8c00;" />
+            <div style="text-align: right; font-weight: bold; margin-top: 3px; font-size: 14px;">@Backspin</div>
+        </div>
+        <div>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: bold;">SIDESPIN (RPM)</label>
+            <input type="range" min="-4000" max="4000" step="100" @bind="Sidespin" @bind:event="oninput" style="width: 100%; accent-color: #ff8c00;" />
+            <div style="text-align: right; font-weight: bold; margin-top: 3px; font-size: 14px;">@Sidespin</div>
+        </div>
+        <div>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: bold;">LAUNCH DIRECTION (°)</label>
+            <input type="range" min="-10" max="10" step="0.5" @bind="SideAngle" @bind:event="oninput" style="width: 100%; accent-color: #ff8c00;" />
+            <div style="text-align: right; font-weight: bold; margin-top: 3px; font-size: 14px;">@SideAngle°</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private float BallSpeed { get; set; } = 135f;
+    private float LaunchAngle { get; set; } = 15f;
+    private float Backspin { get; set; } = 3200f;
+    private float Sidespin { get; set; } = 0f;
+    private float SideAngle { get; set; } = 0f;
+
+    private float CarryDistanceYds { get; set; } = 0f;
+    private float ApexHeightFt { get; set; } = 0f;
+    private float TotalHangTime { get; set; } = 0f;
+    private float OfflineYds { get; set; } = 0f;
+
+    private GolfBallEngine engine = new GolfBallEngine();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("init3DTracer", "canvas3d");
+        }
+    }
+
+    private async Task CalculateFlight()
+    {
+        var points = engine.SimulateShot(BallSpeed, LaunchAngle, SideAngle, Backspin, Sidespin);
+        CarryDistanceYds = engine.CarryDistanceYds;
+        ApexHeightFt = engine.ApexHeightFt;
+        TotalHangTime = engine.TotalHangTime;
+        OfflineYds = engine.OfflineYds;
+
+        var json = System.Text.Json.JsonSerializer.Serialize(points);
+        await JSRuntime.InvokeVoidAsync("update3DTracer", json);
+    }
+
+    private async Task ResetSession()
+    {
+        CarryDistanceYds = 0f;
+        ApexHeightFt = 0f;
+        TotalHangTime = 0f;
+        OfflineYds = 0f;
+        await JSRuntime.InvokeVoidAsync("update3DTracer", "[]");
+    }
+}
