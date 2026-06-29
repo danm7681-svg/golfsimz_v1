@@ -25,71 +25,63 @@
             if (!canvas) return;
             
             scene = new THREE.Scene();
-            // Deep sky background color
-            scene.background = new THREE.Color(0x0a141d);
+            scene.background = new THREE.Color(0x0a141d); // Deep sky background color
             
             camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
             camera.position.set(0, 12, -35);
-            camera.lookAt(0, 8, 120);
+            camera.lookAt(0, 5, 150);
             
             renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
             renderer.setSize(canvas.clientWidth, canvas.clientHeight);
             
-            // 1. ADD THE GRASS FLOOR
-            const grassGeo = new THREE.PlaneGeometry(800, 1000);
-            const grassMat = new THREE.MeshLambertMaterial({ color: 0x1b431e }); // Reacts beautifully to our new sun light
+            // 1. FIXED GRASS FLOOR
+            // Making it a massive square centered right over the origin, so it is guaranteed to be under the camera
+            const grassGeo = new THREE.PlaneGeometry(1000, 1000);
+            // MeshBasicMaterial does NOT need lights to show its color
+            const grassMat = new THREE.MeshBasicMaterial({ color: 0x143317, side: THREE.DoubleSide }); 
             const grassField = new THREE.Mesh(grassGeo, grassMat);
-            grassField.rotation.x = -Math.PI / 2; 
-            grassField.position.set(0, -0.5, 250);
+            
+            grassField.rotation.x = Math.PI / 2; // Flatten flat on ground level
+            grassField.position.set(0, 0, 400);  // Shift it forward down the range
             scene.add(grassField);
 
-            // 2. RANGE GRID LINES (Typo fixed here!)
-            const gridHelper = new THREE.GridHelper(600, 60, 0x33663b, 0x274d2d);
-            gridHelper.position.set(0, -0.4, 250);
+            // 2. RANGE GRID LINES
+            // Placed slightly above the grass (y = 0.05) so they don't blend together or glitch out
+            const gridHelper = new THREE.GridHelper(800, 80, 0x33663b, 0x224428);
+            gridHelper.position.set(0, 0.05, 400);
+            gridHelper.rotation.x = 0;
             scene.add(gridHelper);
 
-            // 3. THE SUN LIGHTING SYSTEM
-            // Ambient light makes sure everything isn't pitch black in the shadows
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-            
-            // The Sun directional light casting shadows down the range
-            const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            sunLight.position.set(40, 80, -20); // Positioned high and slightly behind the golfer
-            scene.add(sunLight);
+            // 3. TREE GENERATION WITH BASIC MATERIALS (Guaranteed visible without complex lighting setup)
+            const trunkMat = new THREE.MeshBasicMaterial({ color: 0x3d2510 });
+            const leavesMat = new THREE.MeshBasicMaterial({ color: 0x0d2911 });
 
-            // 4. GENERATE THE BACKDROP TREES
-            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x422811 });
-            const leavesMat = new THREE.MeshLambertMaterial({ color: 0x113315 });
-
-            // Back Row Woods (at 280 yards deep)
-            for (let x = -120; x <= 120; x += 15) {
-                createSingleTree(x, 280, trunkMat, leavesMat);
-                createSingleTree(x + 7, 295, trunkMat, leavesMat);
+            // Back Row woods at 300 yards deep
+            for (let x = -150; x <= 150; x += 20) {
+                createSingleTree(x, 300, trunkMat, leavesMat);
+                createSingleTree(x + 10, 320, trunkMat, leavesMat);
             }
 
-            // Side Boundary Tree Lines
-            for (let z = 60; z < 260; z += 40) {
-                createSingleTree(-75, z, trunkMat, leavesMat); // Left side
-                createSingleTree(75, z, trunkMat, leavesMat);  // Right side
+            // Left and Right Side boundary tree rows flanking the grid
+            for (let z = 40; z < 300; z += 40) {
+                createSingleTree(-80, z, trunkMat, leavesMat); // Left boundary line
+                createSingleTree(80, z, trunkMat, leavesMat);  // Right boundary line
             }
             
             renderer.render(scene, camera);
         };
 
         function createSingleTree(x, z, trunkMat, leavesMat) {
-            const heightScale = 0.8 + Math.random() * 0.4; // Adds natural height variations
-
             // Trunk cylinder
-            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.4, 6 * heightScale, 5);
+            const trunkGeo = new THREE.CylinderGeometry(0.6, 0.6, 7, 4);
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.set(x, (6 * heightScale) / 2, z);
+            trunk.position.set(x, 3.5, z); // shift up so base sits on y=0
             scene.add(trunk);
 
             // Foliage cone
-            const coneGeo = new THREE.ConeGeometry(4, 9 * heightScale, 5);
+            const coneGeo = new THREE.ConeGeometry(5, 12, 4);
             const leaves = new THREE.Mesh(coneGeo, leavesMat);
-            leaves.position.set(x, (6 * heightScale) + ((9 * heightScale) / 2), z);
+            leaves.position.set(x, 11, z); // stack on top of trunk
             scene.add(leaves);
         }
 
@@ -101,7 +93,7 @@
             const threePoints = [];
             
             points.forEach(p => {
-                threePoints.push(new THREE.Vector3(p.OfflineYds, p.AltitudeFt / 3.28084, p.DownrangeYds));
+                threePoints.push(new THREE.Vector3(p.OfflineYds, (p.AltitudeFt / 3.28084) + 0.1, p.DownrangeYds));
             });
             
             const geometry = new THREE.BufferGeometry().setFromPoints(threePoints);
