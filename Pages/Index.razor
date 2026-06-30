@@ -1,100 +1,130 @@
-@namespace golfsimz_v1
 @page "/"
-@inject IJSRuntime JSRuntime
+@using GolfsimzV1
+@inject IJSRuntime JS
 
-<div style="background-color: #111; color: #fff; font-family: sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 20px; gap: 20px;">
-    
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828;">
-        <h3 style="margin: 0 0 15px 0; color: #ff8c00; font-size: 14px; text-transform: uppercase;">1. Engine Input Verification</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">BALL SPEED (MPH)</label>
-                <input type="number" step="0.1" @bind="BallSpeed" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">LAUNCH ANGLE (°)</label>
-                <input type="number" step="0.1" @bind="LaunchAngle" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">BACKSPIN (RPM)</label>
-                <input type="number" step="50" @bind="Backspin" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">SIDESPIN (RPM)</label>
-                <input type="number" step="50" @bind="Sidespin" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
+<PageTitle>Golfsimz V1 - Launch Monitor</PageTitle>
+
+<div class="app-container">
+    <!-- Header -->
+    <header class="header">
+        <h1>Golfsimz V1</h1>
+        <div class="status">
+            <span class="status-dot ready"></span>
+            <span>Engine Ready</span>
         </div>
-        <div style="margin-top: 15px;">
-            <button @onclick="CalculateFlight" style="background: #ff8c00; border: 0; padding: 10px 20px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px;">Run Physics Engine</button>
+    </header>
+
+    <!-- 3D Canvas -->
+    <div class="canvas-container">
+        <canvas id="three-canvas"></canvas>
+        <div class="view-toggles">
+            <button class="view-toggle active" @onclick="() => ChangeView("perspective")">Perspective</button>
+            <button class="view-toggle" @onclick="() => ChangeView("birdseye")">Top Down</button>
+            <button class="view-toggle" @onclick="() => ChangeView("behind")">Behind Ball</button>
         </div>
     </div>
 
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
-        <div>
-            <div style="font-size: 11px; color: #aaa;">CARRY DISTANCE</div>
-            <div style="font-size: 22px; font-weight: bold; color: #ff8c00;">@CarryDistanceYds.ToString("F1") yds</div>
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <!-- Input Sliders -->
+        <div class="input-group">
+            <label>Ball Speed (mph)</label>
+            <input type="range" min="50" max="200" step="1" 
+                   @bind-value="ballSpeed" @bind-value:event="oninput" />
+            <span class="value-display">@ballSpeed mph</span>
         </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">APEX HEIGHT</div>
-            <div style="font-size: 22px; font-weight: bold;">@ApexHeightFt.ToString("F1") ft</div>
-        </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">HANG TIME</div>
-            <div style="font-size: 22px; font-weight: bold;">@TotalHangTime.ToString("F2") s</div>
-        </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">OFFLINE DISTANCE</div>
-            <div style="font-size: 22px; font-weight: bold; color: @(OfflineYds < 0 ? "#ff4444" : "#44ff44");">@Math.Abs(OfflineYds).ToString("F1") @(OfflineYds < 0 ? "L" : "R")</div>
-        </div>
-    </div>
 
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828; flex: 1; min-height: 200px; overflow-y: auto;">
-        <h4 style="margin: 0 0 10px 0; font-size: 12px; color: #aaa; text-transform: uppercase;">2. Raw Trajectory Data Stream Log</h4>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace; text-align: left;">
-            <thead>
-                <tr style="color: #666; border-bottom: 1px solid #333;">
-                    <th style="padding: 6px 0;">Time (s)</th>
-                    <th>Distance (Yds)</th>
-                    <th>Altitude (Ft)</th>
-                    <th>Offline Deviation (Yds)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var step in TelemetrySteps)
-                {
-                    <tr style="border-bottom: 1px solid #222; color: #ddd;">
-                        <td style="padding: 4px 0;">@step.Time.ToString("F3")</td>
-                        <td>@step.DownrangeYds.ToString("F1")</td>
-                        <td>@step.AltitudeFt.ToString("F1")</td>
-                        <td>@step.OfflineYds.ToString("F2")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div class="input-row">
+            <div class="input-group">
+                <label>Launch Angle (°)</label>
+                <input type="range" min="5" max="40" step="0.5" 
+                       @bind-value="launchAngle" @bind-value:event="oninput" />
+                <span class="value-display">@launchAngle°</span>
+            </div>
+            <div class="input-group">
+                <label>Spin Rate (rpm)</label>
+                <input type="range" min="800" max="6000" step="50" 
+                       @bind-value="spinRate" @bind-value:event="oninput" />
+                <span class="value-display">@spinRate rpm</span>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" @onclick="SimulateShot">
+            🚀 Launch Ball
+        </button>
+
+        <!-- Results -->
+        @if (result != null)
+        {
+            <div class="data-grid">
+                <div class="data-card">
+                    <h3>Carry Distance</h3>
+                    <span class="value">@result.Carry.ToString("F1")</span>
+                    <span class="unit">yds</span>
+                </div>
+                <div class="data-card">
+                    <h3>Apex Height</h3>
+                    <span class="value">@result.Apex.ToString("F1")</span>
+                    <span class="unit">ft</span>
+                </div>
+                <div class="data-card">
+                    <h3>Flight Time</h3>
+                    <span class="value">@result.FlightTime.ToString("F2")</span>
+                    <span class="unit">s</span>
+                </div>
+                <div class="data-card">
+                    <h3>Lateral</h3>
+                    <span class="value" style="color: @(result.LateralDeviation < 0 ? "#ff4455" : "#00ff88")">
+                        @(result.LateralDeviation < 0 ? "L " : "R ")@Math.Abs(result.LateralDeviation).ToString("F1")
+                    </span>
+                    <span class="unit">yds</span>
+                </div>
+            </div>
+
+            <!-- Birdseye View -->
+            <div class="birdseye-container">
+                <canvas id="birdseye-canvas"></canvas>
+            </div>
+        }
     </div>
 </div>
 
 @code {
-    private float BallSpeed { get; set; } = 135f;
-    private float LaunchAngle { get; set; } = 14.5f;
-    private float Backspin { get; set; } = 2800f;
-    private float Sidespin { get; set; } = 0f;
-    private float SideAngle { get; set; } = 0f;
+    private double ballSpeed = 150;
+    private double launchAngle = 12;
+    private double spinRate = 2500;
+    private TrajectoryResult? result;
 
-    private float CarryDistanceYds { get; set; } = 0f;
-    private float ApexHeightFt { get; set; } = 0f;
-    private float TotalHangTime { get; set; } = 0f;
-    private float OfflineYds { get; set; } = 0f;
-
-    private List<TrajectoryPoint> TelemetrySteps { get; set; } = new List<TrajectoryPoint>();
-    private GolfBallEngine engine = new GolfBallEngine();
-
-    private void CalculateFlight()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        TelemetrySteps = engine.SimulateShot(BallSpeed, LaunchAngle, SideAngle, Backspin, Sidespin);
-        CarryDistanceYds = engine.CarryDistanceYds;
-        ApexHeightFt = engine.ApexHeightFt;
-        TotalHangTime = engine.TotalHangTime;
-        OfflineYds = engine.OfflineYds;
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("trajectoryPlot.initializeVisualization");
+        }
+    }
+
+    private async Task SimulateShot()
+    {
+        result = GolfBallEngine.CalculateTrajectory(
+            ballSpeedMph: ballSpeed,
+            launchAngleDeg: launchAngle,
+            spinRateRpm: spinRate
+        );
+
+        // Send to JavaScript for visualization
+        var jsonData = new
+        {
+            trajectory = result.Trajectory.Select(p => new { x = p.X / 0.9144, y = p.Y / 0.3048, z = p.Z / 0.9144 }),
+            carry = result.Carry,
+            lateralDeviation = result.LateralDeviation
+        };
+
+        await JS.InvokeVoidAsync("trajectoryPlot.displayTrajectory", jsonData);
+        StateHasChanged();
+    }
+
+    private async Task ChangeView(string view)
+    {
+        await JS.InvokeVoidAsync("trajectoryPlot.changeView", view);
     }
 }
