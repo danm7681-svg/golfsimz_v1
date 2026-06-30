@@ -18,35 +18,83 @@
     <div class="canvas-container">
         <canvas id="three-canvas"></canvas>
         <div class="view-toggles">
-            <button class="view-toggle active" @onclick="@(() => ChangeView("perspective"))">Perspective</button>
-            <button class="view-toggle" @onclick="@(() => ChangeView("birdseye"))">Top Down</button>
-            <button class="view-toggle" @onclick="@(() => ChangeView("behind"))">Behind Ball</button>
+            <button class="view-toggle active" @onclick="() => ChangeView("perspective")">Perspective</button>
+            <button class="view-toggle" @onclick="() => ChangeView("birdseye")">Top Down</button>
+            <button class="view-toggle" @onclick="() => ChangeView("behind")">Behind Ball</button>
         </div>
     </div>
 
     <!-- Control Panel -->
     <div class="control-panel">
-        <!-- Input Sliders -->
-        <div class="input-group">
-            <label>Ball Speed (mph)</label>
-            <input type="range" min="50" max="200" step="1" 
-                   @bind-value="ballSpeed" @bind-value:event="oninput" />
-            <span class="value-display">@ballSpeed mph</span>
+        
+        <!-- Editable Tiles -->
+        <div class="tile-row">
+            <!-- Ball Speed Tile -->
+            <div class="edit-tile" @onclick="() => StartEditing("ballSpeed")">
+                @if (editingField == "ballSpeed")
+                {
+                    <input type="number" 
+                           class="tile-input" 
+                           @bind-value="ballSpeedInput"
+                           @bind-value:event="oninput"
+                           @onkeypress="(e) => HandleKeyPress(e, "ballSpeed")"
+                           @onblur="() => StopEditing()"
+                           autofocus />
+                }
+                else
+                {
+                    <span class="tile-value">@ballSpeed</span>
+                }
+                <span class="tile-label">Ball Speed</span>
+                <span class="tile-unit">mph</span>
+            </div>
+
+            <!-- Launch Angle Tile -->
+            <div class="edit-tile" @onclick="() => StartEditing("launchAngle")">
+                @if (editingField == "launchAngle")
+                {
+                    <input type="number" 
+                           class="tile-input" 
+                           @bind-value="launchAngleInput"
+                           @bind-value:event="oninput"
+                           @onkeypress="(e) => HandleKeyPress(e, "launchAngle")"
+                           @onblur="() => StopEditing()"
+                           autofocus />
+                }
+                else
+                {
+                    <span class="tile-value">@launchAngle.ToString("F1")</span>
+                }
+                <span class="tile-label">Launch Angle</span>
+                <span class="tile-unit">&deg;</span>
+            </div>
+
+            <!-- Spin Rate Tile -->
+            <div class="edit-tile" @onclick="() => StartEditing("spinRate")">
+                @if (editingField == "spinRate")
+                {
+                    <input type="number" 
+                           class="tile-input" 
+                           @bind-value="spinRateInput"
+                           @bind-value:event="oninput"
+                           @onkeypress="(e) => HandleKeyPress(e, "spinRate")"
+                           @onblur="() => StopEditing()"
+                           autofocus />
+                }
+                else
+                {
+                    <span class="tile-value">@spinRate</span>
+                }
+                <span class="tile-label">Spin Rate</span>
+                <span class="tile-unit">rpm</span>
+            </div>
         </div>
 
-        <div class="input-row">
-            <div class="input-group">
-                <label>Launch Angle (&deg;)</label>
-                <input type="range" min="5" max="40" step="0.5" 
-                       @bind-value="launchAngle" @bind-value:event="oninput" />
-                <span class="value-display">@launchAngle&deg;</span>
-            </div>
-            <div class="input-group">
-                <label>Spin Rate (rpm)</label>
-                <input type="range" min="800" max="6000" step="50" 
-                       @bind-value="spinRate" @bind-value:event="oninput" />
-                <span class="value-display">@spinRate rpm</span>
-            </div>
+        <!-- Quick Presets -->
+        <div class="preset-row">
+            <button class="preset-btn" @onclick="() => SetPreset(165, 10.5, 2800)">Driver</button>
+            <button class="preset-btn" @onclick="() => SetPreset(140, 18, 5000)">7 Iron</button>
+            <button class="preset-btn" @onclick="() => SetPreset(110, 28, 7000)">PW</button>
         </div>
 
         <button class="btn btn-primary" @onclick="SimulateShot">
@@ -85,7 +133,6 @@
                 </div>
             </div>
 
-            <!-- Birdseye View -->
             <div class="birdseye-container">
                 <canvas id="birdseye-canvas"></canvas>
             </div>
@@ -94,9 +141,19 @@
 </div>
 
 @code {
+    // Current values
     private double ballSpeed = 150;
     private double launchAngle = 12;
     private double spinRate = 2500;
+
+    // Input binding values
+    private string ballSpeedInput = "150";
+    private string launchAngleInput = "12";
+    private string spinRateInput = "2500";
+
+    // Which tile is being edited (null = none)
+    private string? editingField = null;
+
     private TrajectoryResult? result;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -107,21 +164,72 @@
         }
     }
 
+    private void StartEditing(string field)
+    {
+        editingField = field;
+        
+        // Set the input to current value
+        switch (field)
+        {
+            case "ballSpeed":
+                ballSpeedInput = ballSpeed.ToString();
+                break;
+            case "launchAngle":
+                launchAngleInput = launchAngle.ToString("F1");
+                break;
+            case "spinRate":
+                spinRateInput = spinRate.ToString();
+                break;
+        }
+    }
+
+    private void StopEditing()
+    {
+        // Apply the edited values
+        if (editingField == "ballSpeed" && double.TryParse(ballSpeedInput, out var bs))
+            ballSpeed = Math.Clamp(bs, 50, 200);
+        else if (editingField == "launchAngle" && double.TryParse(launchAngleInput, out var la))
+            launchAngle = Math.Clamp(la, 5, 40);
+        else if (editingField == "spinRate" && double.TryParse(spinRateInput, out var sr))
+            spinRate = Math.Clamp(sr, 800, 6000);
+
+        editingField = null;
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e, string field)
+    {
+        if (e.Key == "Enter")
+        {
+            StopEditing();
+        }
+    }
+
+    private void SetPreset(double speed, double angle, double spin)
+    {
+        ballSpeed = speed;
+        launchAngle = angle;
+        spinRate = spin;
+        editingField = null;
+    }
+
     private async Task SimulateShot()
     {
+        // Apply any pending edits first
+        if (editingField != null)
+            StopEditing();
+
         result = GolfBallEngine.CalculateTrajectory(
             ballSpeedMph: ballSpeed,
             launchAngleDeg: launchAngle,
             spinRateRpm: spinRate
         );
 
-        // Send to JavaScript for visualization
         var jsonData = new
         {
-            trajectory = result.Trajectory.Select(p => new { 
-                x = p.X / 0.9144, 
-                y = p.Y / 0.3048, 
-                z = p.Z / 0.9144 
+            trajectory = result.Trajectory.Select(p => new {
+                x = p.X / 0.9144,
+                y = p.Y / 0.3048,
+                z = p.Z / 0.9144
             }),
             carry = result.Carry,
             lateralDeviation = result.LateralDeviation
