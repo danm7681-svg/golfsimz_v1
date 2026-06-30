@@ -1,0 +1,21 @@
+[build]
+  command = "dotnet publish -c Release -o publish"
+  publish = "publish/wwwroot"
+
+[build.environment]
+  DOTNET_VERSION = "8.0"
+  DOTNET_INSTALL_DIR = "/opt/buildhome/.dotnet"
+
+# Tell Netlify this is a .NET project, not Node.js
+[build.processing]
+  skip_processing = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/_framework/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
