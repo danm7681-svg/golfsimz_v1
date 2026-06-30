@@ -1,58 +1,154 @@
-public List<TrajectoryPoint> SimulateShot(float speedMph, float launchDeg, float sideDeg, float backspinRpm, float sidespinRpm)
+using System;
+using System.Collections.Generic;
+
+namespace GolfsimzV1;
+
+public class GolfBallEngine
 {
-    var path = new List<TrajectoryPoint>();
-    float v0 = speedMph * 0.44704f;
-    float theta = launchDeg * (float)(Math.PI / 180.0f);
-    float phi = sideDeg * (float)(Math.PI / 180.0f);
-
-    float x = 0, y = 0, z = 0;
-    float vx = v0 * (float)(Math.Cos(theta) * Math.Sin(phi));
-    float vy = v0 * (float)Math.Sin(theta);
-    float vz = v0 * (float)(Math.Cos(theta) * Math.Cos(phi));
-
-    float omegaTotal = (float)((Math.Sqrt(backspinRpm * backspinRpm + sidespinRpm * sidespinRpm) * 2.0 * Math.PI) / 60.0);
-    float spinAxisTilt = (float)Math.Atan2(sidespinRpm, backspinRpm);
-
-    float currentTime = 0.0f;
-    ApexHeightFt = 0.0f;
-
-    // Physics constants tuned for 7-iron trajectory
-    float dragCoef = 0.22f; 
-    float liftCoefBase = 0.35f;
-
-    while (y >= 0.0f && currentTime < 15.0f)
+    // Constants
+    public const double Gravity = 9.81;           // m/s²
+    public const double BallMass = 0.0459;         // kg (standard golf ball)
+    public const double BallRadius = 0.02135;      // meters
+    public const double AirDensity = 1.225;        // kg/m³ at sea level
+    public const double Cd = 0.25;                 // Drag coefficient
+    public const double Cl = 0.18;                 // Lift coefficient (Magnus)
+    
+    /// <summary>
+    /// Calculate a full trajectory given initial launch conditions
+    /// </summary>
+    public static TrajectoryResult CalculateTrajectory(
+        double ballSpeedMph,      // Ball speed in mph
+        double launchAngleDeg,    // Launch angle in degrees
+        double spinRateRpm,       // Spin rate in rpm
+        double spinAxisDeg = 0,   // Spin axis tilt in degrees (0 = straight)
+        double windMph = 0,       // Wind speed in mph
+        double windDirDeg = 0)    // Wind direction in degrees (0 = headwind)
     {
-        float vMag = (float)Math.Sqrt(vx * vx + vy * vy + vz * vz);
-        if (vMag < 0.1f) break;
-
-        float spinRatio = (Radius * omegaTotal) / vMag;
+        // Convert inputs to metric
+        double v0 = ballSpeedMph * 0.44704;          // m/s
+        double angle = launchAngleDeg * Math.PI / 180.0;
+        double spinAxis = spinAxisDeg * Math.PI / 180.0;
+        double windSpeed = windMph * 0.44704;
+        double windDir = windDirDeg * Math.PI / 180.0;
+        double spinRate = spinRateRpm * 2.0 * Math.PI / 60.0;  // rad/s
         
-        // Tuned coefficients: lower drag, higher lift
-        float cl = liftCoefBase * (1.0f + 0.5f * spinRatio);
-        float cd = dragCoef * (1.0f + 0.2f * spinRatio);
-
-        float dragMag = 0.5f * AirDensity * Area * cd * (vMag * vMag);
-        float liftMag = 0.5f * AirDensity * Area * cl * (vMag * vMag);
-
-        // Calculate Accelerations
-        float ax = (-dragMag * (vx / vMag)) / Mass;
-        float ay = ((-dragMag * (vy / vMag)) / Mass) - Gravity + (liftMag / Mass); // Adding lift directly to Y
-        float az = (-dragMag * (vz / vMag)) / Mass;
-
-        vx += ax * TimeStepDt;
-        vy += ay * TimeStepDt;
-        vz += az * TimeStepDt;
-
-        x += vx * TimeStepDt;
-        y += vy * TimeStepDt;
-        z += vz * TimeStepDt;
-        currentTime += TimeStepDt;
-
-        if (currentTime % 0.03f < 0.001f) // Log every ~30ms
+        // Initial velocity components
+        double vx = v0 * Math.Cos(angle);
+        double vy = v0 * Math.Sin(angle);
+        double vz = 0;
+        
+        // Ball cross-sectional area
+        double area = Math.PI * BallRadius * BallRadius;
+        
+        // Simulation parameters
+        double dt = 0.001;           // 1ms timestep
+        double maxTime = 15.0;       // Max 15 seconds
+        double x = 0, y = 0, z = 0;
+        
+        var trajectory = new List<TrajectoryPoint>();
+        trajectory.Add(new TrajectoryPoint { X = x, Y = y, Z = z });
+        
+        for (double t = 0; t < maxTime; t += dt)
         {
-            path.Add(new TrajectoryPoint { Time = currentTime, DownrangeYds = z * 1.09361f, AltitudeFt = y * 3.28084f, OfflineYds = x * 1.09361f });
+            // Current speed
+            double v = Math.Sqrt(vx * vx + vy * vy + vz * vz);
+            
+            // Reynolds number
+            double Re = AirDensity * v * 2 * BallRadius / 1.81e-5;
+            
+            // Drag coefficient adjustment for Reynolds number
+            double cdAdj = Cd;
+            if (Re < 50000) cdAdj = 0.45;
+            else if (Re < 120000) cdAdj = 0.28;
+            else cdAdj = 0.22;
+            
+            // Drag force magnitude
+            double dragMagnitude = 0.5 * AirDensity * cdAdj * area * v * v;
+            
+            // Drag acceleration components
+            double axDrag = -dragMagnitude / BallMass * (vx / v);
+            double ayDrag = -dragMagnitude / BallMass * (vy / v);
+            double azDrag = -dragMagnitude / BallMass * (vz / v);
+            
+            // Magnus force (simplified)
+            double magnusMagnitude = 0.5 * AirDensity * Cl * area * v * v;
+            double magnusDirX = -Math.Sin(spinAxis);
+            double magnusDirZ = Math.Cos(spinAxis);
+            
+            double axMagnus = magnusMagnitude / BallMass * magnusDirX;
+            double azMagnus = magnusMagnitude / BallMass * magnusDirZ;
+            
+            // Wind effect (simplified)
+            double windVx = windSpeed * Math.Cos(windDir);
+            double windVz = windSpeed * Math.Sin(windDir);
+            
+            // Total acceleration
+            double ax = axDrag + axMagnus;
+            double ay = ayDrag - Gravity;
+            double az = azDrag + azMagnus;
+            
+            // Update velocity
+            vx += ax * dt;
+            vy += ay * dt;
+            vz += az * dt;
+            
+            // Update position
+            x += vx * dt;
+            z += vz * dt;
+            y += vy * dt;
+            
+            trajectory.Add(new TrajectoryPoint { X = x, Y = y, Z = z });
+            
+            // Stop when ball hits ground
+            if (y <= 0 && t > 0.1)
+            {
+                break;
+            }
         }
-        if (y * 3.28084f > ApexHeightFt) ApexHeightFt = y * 3.28084f;
+        
+        // Calculate results
+        double carryYards = x / 0.9144;
+        double lateralYards = z / 0.9144;
+        
+        // Find apex
+        double maxY = 0;
+        foreach (var p in trajectory)
+        {
+            if (p.Y > maxY) maxY = p.Y;
+        }
+        
+        // Flight time
+        double flightTime = trajectory.Count * dt;
+        
+        return new TrajectoryResult
+        {
+            Trajectory = trajectory,
+            Carry = carryYards,
+            LateralDeviation = lateralYards,
+            Apex = maxY / 0.3048,       // Convert to feet
+            FlightTime = flightTime,
+            BallSpeedMph = ballSpeedMph,
+            LaunchAngleDeg = launchAngleDeg,
+            SpinRateRpm = spinRateRpm
+        };
     }
-    return path;
+}
+
+public class TrajectoryPoint
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Z { get; set; }
+}
+
+public class TrajectoryResult
+{
+    public List<TrajectoryPoint> Trajectory { get; set; } = new();
+    public double Carry { get; set; }
+    public double LateralDeviation { get; set; }
+    public double Apex { get; set; }
+    public double FlightTime { get; set; }
+    public double BallSpeedMph { get; set; }
+    public double LaunchAngleDeg { get; set; }
+    public double SpinRateRpm { get; set; }
 }
