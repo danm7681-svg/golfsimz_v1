@@ -10,28 +10,18 @@
     
     <title>Golfsimz V1 - Launch Monitor</title>
     
-    <!-- Base URL (required for Blazor) -->
     <base href="/" />
     
-    <!-- App CSS -->
     <link rel="stylesheet" href="css/app.css">
     
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
-    
-    <!-- Apple Touch Icon -->
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9971;</text></svg>">
     
     <style>
-        /* Loading screen before Blazor boots */
         #blazor-loading {
             position: fixed;
             top: 0;
@@ -75,34 +65,54 @@
     </style>
 </head>
 <body>
-    <!-- Loading indicator (shown until Blazor initializes) -->
     <div id="blazor-loading">
         <div class="loading-spinner"></div>
         <div class="loading-text">LOADING ENGINE</div>
     </div>
 
-    <!-- Blazor root component -->
-    <div id="app">
-        <!-- Blazor will render here -->
-    </div>
+    <div id="app"></div>
 
-    <!-- Blazor WebAssembly runtime -->
+    <!-- Three.js import map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Load visualization modules BEFORE Blazor -->
+    <script type="module">
+        import * as tp from './js/trajectoryPlot.js';
+        window.trajectoryPlot = tp;
+        console.log('TrajectoryPlot module loaded and attached to window');
+    </script>
+
+    <!-- Blazor WebAssembly -->
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     
-    <!-- Visualization scripts -->
-    <script type="module" src="js/trajectoryPlot.js"></script>
-    
-    <!-- Hide loading screen when Blazor is ready -->
     <script>
-        Blazor.start().then(function () {
-            const loading = document.getElementById('blazor-loading');
-            if (loading) {
-                loading.classList.add('hidden');
-                setTimeout(function () {
-                    loading.remove();
-                }, 500);
+        // Wait for trajectoryPlot to be ready, then start Blazor
+        function startBlazorWhenReady() {
+            if (window.trajectoryPlot && window.trajectoryPlot.initializeVisualization) {
+                console.log('trajectoryPlot found, starting Blazor');
+                Blazor.start().then(function () {
+                    const loading = document.getElementById('blazor-loading');
+                    if (loading) {
+                        loading.classList.add('hidden');
+                        setTimeout(function () {
+                            loading.remove();
+                        }, 500);
+                    }
+                });
+            } else {
+                console.log('Waiting for trajectoryPlot...');
+                setTimeout(startBlazorWhenReady, 100);
             }
-        });
+        }
+        
+        startBlazorWhenReady();
     </script>
 </body>
 </html>
