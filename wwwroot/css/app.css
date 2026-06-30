@@ -292,4 +292,97 @@ html, body {
     .canvas-container {
         min-height: 40vh;
     }
+    /* ===== Editable Tiles ===== */
+.tile-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.edit-tile {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 90px;
+    justify-content: center;
+}
+
+.edit-tile:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.edit-tile:active {
+    transform: scale(0.97);
+}
+
+.tile-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.tile-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.tile-unit {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.tile-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--accent);
+    color: var(--accent);
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    font-family: inherit;
+    padding: 0.2rem 0;
+}
+
+.tile-input::-webkit-inner-spin-button,
+.tile-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ===== Preset Buttons ===== */
+.preset-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.preset-btn {
+    flex: 1;
+    padding: 0.6rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
 }
