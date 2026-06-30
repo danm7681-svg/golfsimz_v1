@@ -1,109 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GolfSim</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="description" content="Portable Golf Launch Monitor - Physics Engine Simulator">
+    
+    <title>Golfsimz V1 - Launch Monitor</title>
+    
+    <!-- Base URL (required for Blazor) -->
     <base href="/" />
+    
+    <!-- App CSS -->
+    <link rel="stylesheet" href="css/app.css">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+    
     <style>
-        html, body { margin: 0; padding: 0; overflow: hidden; background-color: #111; width: 100%; height: 100%; }
+        /* Loading screen before Blazor boots */
+        #blazor-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0f;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.4s ease-out;
+        }
+        
+        #blazor-loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(0, 212, 255, 0.15);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 1.5rem;
+            color: #8888aa;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+        }
     </style>
 </head>
 <body>
-    <div id="app">
-        <div style="color: white; font-family: sans-serif; text-align: center; margin-top: 200px; font-size: 18px;">
-            Initializing Trackman Simulator Environment...
-        </div>
+    <!-- Loading indicator (shown until Blazor initializes) -->
+    <div id="blazor-loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">LOADING ENGINE</div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Blazor root component -->
+    <div id="app">
+        <!-- Blazor will render here -->
+    </div>
+
+    <!-- Blazor WebAssembly runtime -->
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    
+    <!-- Visualization scripts -->
+    <script type="module" src="js/trajectoryPlot.js"></script>
+    
+    <!-- Hide loading screen when Blazor is ready -->
     <script>
-        let scene, camera, renderer, line;
-        
-        window.init3DTracer = (canvasId) => {
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
-            
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a141d); // Deep sky background color
-            
-            camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
-            camera.position.set(0, 12, -35);
-            camera.lookAt(0, 5, 150);
-            
-            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-            
-            // 1. FIXED GRASS FLOOR
-            // Making it a massive square centered right over the origin, so it is guaranteed to be under the camera
-            const grassGeo = new THREE.PlaneGeometry(1000, 1000);
-            // MeshBasicMaterial does NOT need lights to show its color
-            const grassMat = new THREE.MeshBasicMaterial({ color: 0x143317, side: THREE.DoubleSide }); 
-            const grassField = new THREE.Mesh(grassGeo, grassMat);
-            
-            grassField.rotation.x = Math.PI / 2; // Flatten flat on ground level
-            grassField.position.set(0, 0, 400);  // Shift it forward down the range
-            scene.add(grassField);
-
-            // 2. RANGE GRID LINES
-            // Placed slightly above the grass (y = 0.05) so they don't blend together or glitch out
-            const gridHelper = new THREE.GridHelper(800, 80, 0x33663b, 0x224428);
-            gridHelper.position.set(0, 0.05, 400);
-            gridHelper.rotation.x = 0;
-            scene.add(gridHelper);
-
-            // 3. TREE GENERATION WITH BASIC MATERIALS (Guaranteed visible without complex lighting setup)
-            const trunkMat = new THREE.MeshBasicMaterial({ color: 0x3d2510 });
-            const leavesMat = new THREE.MeshBasicMaterial({ color: 0x0d2911 });
-
-            // Back Row woods at 300 yards deep
-            for (let x = -150; x <= 150; x += 20) {
-                createSingleTree(x, 300, trunkMat, leavesMat);
-                createSingleTree(x + 10, 320, trunkMat, leavesMat);
+        Blazor.start().then(function () {
+            const loading = document.getElementById('blazor-loading');
+            if (loading) {
+                loading.classList.add('hidden');
+                setTimeout(function () {
+                    loading.remove();
+                }, 500);
             }
-
-            // Left and Right Side boundary tree rows flanking the grid
-            for (let z = 40; z < 300; z += 40) {
-                createSingleTree(-80, z, trunkMat, leavesMat); // Left boundary line
-                createSingleTree(80, z, trunkMat, leavesMat);  // Right boundary line
-            }
-            
-            renderer.render(scene, camera);
-        };
-
-        function createSingleTree(x, z, trunkMat, leavesMat) {
-            // Trunk cylinder
-            const trunkGeo = new THREE.CylinderGeometry(0.6, 0.6, 7, 4);
-            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.set(x, 3.5, z); // shift up so base sits on y=0
-            scene.add(trunk);
-
-            // Foliage cone
-            const coneGeo = new THREE.ConeGeometry(5, 12, 4);
-            const leaves = new THREE.Mesh(coneGeo, leavesMat);
-            leaves.position.set(x, 11, z); // stack on top of trunk
-            scene.add(leaves);
-        }
-
-        window.update3DTracer = (pointsJson) => {
-            if (!scene) return;
-            if (line) scene.remove(line);
-            
-            const points = JSON.parse(pointsJson);
-            const threePoints = [];
-            
-            points.forEach(p => {
-                threePoints.push(new THREE.Vector3(p.OfflineYds, (p.AltitudeFt / 3.28084) + 0.1, p.DownrangeYds));
-            });
-            
-            const geometry = new THREE.BufferGeometry().setFromPoints(threePoints);
-            const material = new THREE.LineBasicMaterial({ color: 0xff8c00, linewidth: 6 }); 
-            
-            line = new THREE.Line(geometry, material);
-            scene.add(line);
-            renderer.render(scene, camera);
-        };
+        });
     </script>
-    <script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>
