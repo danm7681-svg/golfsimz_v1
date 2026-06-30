@@ -1,100 +1,123 @@
-@namespace golfsimz_v1
 @page "/"
+@using golfsimz_v1
 @inject IJSRuntime JSRuntime
 
-<div style="background-color: #111; color: #fff; font-family: sans-serif; min-height: 100vh; display: flex; flex-direction: column; padding: 20px; gap: 20px;">
-    
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828;">
-        <h3 style="margin: 0 0 15px 0; color: #ff8c00; font-size: 14px; text-transform: uppercase;">1. Engine Input Verification</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">BALL SPEED (MPH)</label>
-                <input type="number" step="0.1" @bind="BallSpeed" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">LAUNCH ANGLE (°)</label>
-                <input type="number" step="0.1" @bind="LaunchAngle" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">BACKSPIN (RPM)</label>
-                <input type="number" step="50" @bind="Backspin" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-            <div>
-                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">SIDESPIN (RPM)</label>
-                <input type="number" step="50" @bind="Sidespin" style="width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px;" />
-            </div>
-        </div>
-        <div style="margin-top: 15px;">
-            <button @onclick="CalculateFlight" style="background: #ff8c00; border: 0; padding: 10px 20px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px;">Run Physics Engine</button>
+<div class="app-container">
+    <!-- 3D Viewport -->
+    <div class="viewport" style="flex:1; position:relative; background:#0a0a1a; overflow:hidden;">
+        <canvas id="threeCanvas" style="width:100%; height:100%; display:block;"></canvas>
+        
+        <!-- Birdseye View (Larger, Right Side) -->
+        <div class="birdseye-overlay">
+            <canvas id="birdseyeCanvas" width="320" height="420"></canvas>
         </div>
     </div>
 
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
-        <div>
-            <div style="font-size: 11px; color: #aaa;">CARRY DISTANCE</div>
-            <div style="font-size: 22px; font-weight: bold; color: #ff8c00;">@CarryDistanceYds.ToString("F1") yds</div>
+    <!-- Data Panel -->
+    <div class="data-panel">
+        <div class="metric">
+            <span class="label">CARRY</span>
+            <span class="value">@(CarryDistanceYds.ToString("F1"))</span>
+            <span class="unit">yds</span>
         </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">APEX HEIGHT</div>
-            <div style="font-size: 22px; font-weight: bold;">@ApexHeightFt.ToString("F1") ft</div>
+        <div class="metric">
+            <span class="label">TOTAL</span>
+            <span class="value">@((CarryDistanceYds + 10).ToString("F1"))</span>
+            <span class="unit">yds</span>
         </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">HANG TIME</div>
-            <div style="font-size: 22px; font-weight: bold;">@TotalHangTime.ToString("F2") s</div>
+        <div class="metric">
+            <span class="label">BALL SPEED</span>
+            <span class="value">@(BallSpeed.ToString("F0"))</span>
+            <span class="unit">mph</span>
         </div>
-        <div>
-            <div style="font-size: 11px; color: #aaa;">OFFLINE DISTANCE</div>
-            <div style="font-size: 22px; font-weight: bold; color: @(OfflineYds < 0 ? "#ff4444" : "#44ff44");">@Math.Abs(OfflineYds).ToString("F1") @(OfflineYds < 0 ? "L" : "R")</div>
+        <div class="metric">
+            <span class="label">LAUNCH ANG.</span>
+            <span class="value">@(LaunchAngle.ToString("F1"))</span>
+            <span class="unit">deg</span>
+        </div>
+        <div class="metric">
+            <span class="label">HEIGHT</span>
+            <span class="value">@(ApexHeightFt.ToString("F0"))</span>
+            <span class="unit">ft</span>
+        </div>
+        <div class="metric">
+            <span class="label">LANDING ANGLE</span>
+            <span class="value">@(LandingAngleDeg.ToString("F0"))</span>
+            <span class="unit">deg</span>
         </div>
     </div>
 
-    <div style="background: #181818; padding: 20px; border-radius: 8px; border: 1px solid #282828; flex: 1; min-height: 200px; overflow-y: auto;">
-        <h4 style="margin: 0 0 10px 0; font-size: 12px; color: #aaa; text-transform: uppercase;">2. Raw Trajectory Data Stream Log</h4>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace; text-align: left;">
-            <thead>
-                <tr style="color: #666; border-bottom: 1px solid #333;">
-                    <th style="padding: 6px 0;">Time (s)</th>
-                    <th>Distance (Yds)</th>
-                    <th>Altitude (Ft)</th>
-                    <th>Offline Deviation (Yds)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var step in TelemetrySteps)
-                {
-                    <tr style="border-bottom: 1px solid #222; color: #ddd;">
-                        <td style="padding: 4px 0;">@step.Time.ToString("F3")</td>
-                        <td>@step.DownrangeYds.ToString("F1")</td>
-                        <td>@step.AltitudeFt.ToString("F1")</td>
-                        <td>@step.OfflineYds.ToString("F2")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <!-- Editable Tiles -->
+    <div class="tiles-bar">
+        <div class="tile">
+            <span class="tile-label">CLUB</span>
+            <input @bind="Club" class="tile-input" />
+        </div>
+        <div class="tile">
+            <span class="tile-label">BALL SPEED</span>
+            <input @bind="BallSpeed" type="number" class="tile-input" />
+        </div>
+        <div class="tile">
+            <span class="tile-label">LAUNCH</span>
+            <input @bind="LaunchAngle" type="number" class="tile-input" />
+        </div>
+        <div class="tile">
+            <span class="tile-label">BACKSPIN</span>
+            <input @bind="Backspin" type="number" class="tile-input" />
+        </div>
+        <div class="tile">
+            <span class="tile-label">SIDESPIN</span>
+            <input @bind="Sidespin" type="number" class="tile-input" />
+        </div>
+        <div class="tile">
+            <span class="tile-label">SIDE ANGLE</span>
+            <input @bind="SideAngle" type="number" class="tile-input" />
+        </div>
+        <button @onclick="CalculateFlight" class="run-btn">▶</button>
     </div>
 </div>
 
 @code {
-    private float BallSpeed { get; set; } = 135f;
+    private string Club { get; set; } = "7 Iron";
+    private float BallSpeed { get; set; } = 120f;
     private float LaunchAngle { get; set; } = 14.5f;
     private float Backspin { get; set; } = 2800f;
     private float Sidespin { get; set; } = 0f;
     private float SideAngle { get; set; } = 0f;
 
-    private float CarryDistanceYds { get; set; } = 0f;
-    private float ApexHeightFt { get; set; } = 0f;
-    private float TotalHangTime { get; set; } = 0f;
-    private float OfflineYds { get; set; } = 0f;
+    private float CarryDistanceYds { get; set; }
+    private float ApexHeightFt { get; set; }
+    private float TotalHangTime { get; set; }
+    private float OfflineYds { get; set; }
+    private float LandingAngleDeg { get; set; }
 
-    private List<TrajectoryPoint> TelemetrySteps { get; set; } = new List<TrajectoryPoint>();
-    private GolfBallEngine engine = new GolfBallEngine();
+    private List<TrajectoryPoint> TrajectoryPoints { get; set; } = new();
+    private GolfBallEngine engine = new();
 
-    private void CalculateFlight()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        TelemetrySteps = engine.SimulateShot(BallSpeed, LaunchAngle, SideAngle, Backspin, Sidespin);
+        if (firstRender)
+        {
+            await Task.Delay(300);
+            await JSRuntime.InvokeVoidAsync("init3DTracer", "threeCanvas");
+            await Task.Delay(100);
+            CalculateFlight();
+        }
+    }
+
+    private async void CalculateFlight()
+    {
+        TrajectoryPoints = engine.SimulateShot(BallSpeed, LaunchAngle, SideAngle, Backspin, Sidespin);
         CarryDistanceYds = engine.CarryDistanceYds;
         ApexHeightFt = engine.ApexHeightFt;
         TotalHangTime = engine.TotalHangTime;
         OfflineYds = engine.OfflineYds;
+        LandingAngleDeg = engine.LandingAngleDeg;
+
+        var json = System.Text.Json.JsonSerializer.Serialize(TrajectoryPoints);
+        await JSRuntime.InvokeVoidAsync("update3DTracer", json);
+        await JSRuntime.InvokeVoidAsync("drawBirdseye", "birdseyeCanvas", json);
+
+        StateHasChanged();
     }
 }

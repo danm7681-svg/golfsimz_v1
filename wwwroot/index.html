@@ -5,105 +5,165 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GolfSim</title>
     <base href="/" />
+
+    <link href="css/app.css" rel="stylesheet" />
     <style>
-        html, body { margin: 0; padding: 0; overflow: hidden; background-color: #111; width: 100%; height: 100%; }
+        html, body { margin:0; padding:0; overflow:hidden; background:#111; width:100%; height:100%; }
+        #threeCanvas { width:100% !important; height:100% !important; display:block; background:#0a0a1a; }
     </style>
-</head>
-<body>
-    <div id="app">
-        <div style="color: white; font-family: sans-serif; text-align: center; margin-top: 200px; font-size: 18px;">
-            Initializing Trackman Simulator Environment...
-        </div>
-    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        let scene, camera, renderer, line;
-        
-        window.init3DTracer = (canvasId) => {
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
-            
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a141d); // Deep sky background color
-            
-            camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 1, 1000);
-            camera.position.set(0, 12, -35);
-            camera.lookAt(0, 5, 150);
-            
-            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-            
-            // 1. FIXED GRASS FLOOR
-            // Making it a massive square centered right over the origin, so it is guaranteed to be under the camera
-            const grassGeo = new THREE.PlaneGeometry(1000, 1000);
-            // MeshBasicMaterial does NOT need lights to show its color
-            const grassMat = new THREE.MeshBasicMaterial({ color: 0x143317, side: THREE.DoubleSide }); 
-            const grassField = new THREE.Mesh(grassGeo, grassMat);
-            
-            grassField.rotation.x = Math.PI / 2; // Flatten flat on ground level
-            grassField.position.set(0, 0, 400);  // Shift it forward down the range
-            scene.add(grassField);
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
 
-            // 2. RANGE GRID LINES
-            // Placed slightly above the grass (y = 0.05) so they don't blend together or glitch out
-            const gridHelper = new THREE.GridHelper(800, 80, 0x33663b, 0x224428);
-            gridHelper.position.set(0, 0.05, 400);
-            gridHelper.rotation.x = 0;
-            scene.add(gridHelper);
+<div id="app">Loading...</div>
 
-            // 3. TREE GENERATION WITH BASIC MATERIALS (Guaranteed visible without complex lighting setup)
-            const trunkMat = new THREE.MeshBasicMaterial({ color: 0x3d2510 });
-            const leavesMat = new THREE.MeshBasicMaterial({ color: 0x0d2911 });
+<script>
+    let scene, camera, renderer, controls, line, ballMesh;
+    let isBackgroundLoaded = false;
 
-            // Back Row woods at 300 yards deep
-            for (let x = -150; x <= 150; x += 20) {
-                createSingleTree(x, 300, trunkMat, leavesMat);
-                createSingleTree(x + 10, 320, trunkMat, leavesMat);
-            }
+    function createFlag(x, z, color) {
+        const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 3, 4),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        pole.position.set(x, 1.5, z);
+        scene.add(pole);
 
-            // Left and Right Side boundary tree rows flanking the grid
-            for (let z = 40; z < 300; z += 40) {
-                createSingleTree(-80, z, trunkMat, leavesMat); // Left boundary line
-                createSingleTree(80, z, trunkMat, leavesMat);  // Right boundary line
-            }
-            
-            renderer.render(scene, camera);
-        };
+        const flag = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.6, 0.8),
+            new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide })
+        );
+        flag.position.set(x + 0.3, 3, z);
+        scene.add(flag);
 
-        function createSingleTree(x, z, trunkMat, leavesMat) {
-            // Trunk cylinder
-            const trunkGeo = new THREE.CylinderGeometry(0.6, 0.6, 7, 4);
-            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.set(x, 3.5, z); // shift up so base sits on y=0
-            scene.add(trunk);
+        const circle = new THREE.Mesh(
+            new THREE.RingGeometry(1.5, 2, 20),
+            new THREE.MeshBasicMaterial({ color: 0xffaa00, side: THREE.DoubleSide })
+        );
+        circle.rotation.x = -Math.PI / 2;
+        circle.position.set(x, 0.01, z);
+        scene.add(circle);
+    }
+        function loadLocalBackground() {
+            const textureLoader = new THREE.TextureLoader();
 
-            // Foliage cone
-            const coneGeo = new THREE.ConeGeometry(5, 12, 4);
-            const leaves = new THREE.Mesh(coneGeo, leavesMat);
-            leaves.position.set(x, 11, z); // stack on top of trunk
-            scene.add(leaves);
-        }
+            // This loads the .jpg and assigns it to the scene
+            textureLoader.load('/images/range.jpg', function(texture) {
+                // This ensures the image stretches correctly to the background
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
 
-        window.update3DTracer = (pointsJson) => {
-            if (!scene) return;
-            if (line) scene.remove(line);
-            
-            const points = JSON.parse(pointsJson);
-            const threePoints = [];
-            
-            points.forEach(p => {
-                threePoints.push(new THREE.Vector3(p.OfflineYds, (p.AltitudeFt / 3.28084) + 0.1, p.DownrangeYds));
+                // CRITICAL: Re-render the scene once the image is loaded
+                renderer.render(scene, camera);
+            }, undefined, function(err) {
+                console.error('Error loading background:', err);
+                // Fallback if the image doesn't load
+                scene.background = new THREE.Color(0x87CEEB);
+                renderer.render(scene, camera);
             });
-            
-            const geometry = new THREE.BufferGeometry().setFromPoints(threePoints);
-            const material = new THREE.LineBasicMaterial({ color: 0xff8c00, linewidth: 6 }); 
-            
-            line = new THREE.Line(geometry, material);
-            scene.add(line);
-            renderer.render(scene, camera);
-        };
-    </script>
-    <script src="_framework/blazor.webassembly.js"></script>
+        }
+        // ---- Scene elements ----
+        createFlag(0, 50, 0xff0000);
+        createFlag(0, 100, 0x00ff00);
+        createFlag(0, 150, 0x0000ff);
+        createFlag(0, 200, 0xffaa00);
+
+        const teeMat = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 0.1, 3),
+            new THREE.MeshLambertMaterial({ color: 0x1a3a1a })
+        );
+        teeMat.position.set(0, 0, 0);
+        scene.add(teeMat);
+
+        const ambient = new THREE.AmbientLight(0x404060, 0.4);
+        scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+        sun.position.set(30, 50, 20);
+        sun.castShadow = true;
+        scene.add(sun);
+
+        const originSphere = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        originSphere.position.set(0, 0.3, 0);
+        scene.add(originSphere);
+
+        renderer.render(scene, camera);
+        console.log('Scene initialized');
+    };
+    
+    };
+    // ---- drawBirdseye ----
+    window.drawBirdseye = function(canvasId, pointsJson) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#2d8a4e';
+        ctx.fillRect(0, 0, w, h);
+
+        try {
+            const points = JSON.parse(pointsJson);
+            if (!points || points.length === 0) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('No data', w/2-25, h/2);
+                return;
+            }
+            const maxZ = Math.max.apply(null, points.map(p => p.DownrangeYds)) || 1;
+            ctx.fillStyle = '#1a3a1a';
+            ctx.fillRect(0, h/2-20, w, 40);
+            ctx.strokeStyle = '#00fff7';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (var i = 0; i < points.length; i++) {
+                var x = (points[i].OfflineYds / maxZ) * w/2 + w/2;
+                var y = (points[i].DownrangeYds / maxZ) * h/2 + h/2;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            var last = points[points.length - 1];
+            var bx = (last.OfflineYds / maxZ) * w/2 + w/2;
+            var by = (last.DownrangeYds / maxZ) * h/2 + h/2;
+            ctx.beginPath();
+            ctx.arc(bx, by, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00fff7';
+            ctx.fill();
+        } catch(e) {
+            console.error('drawBirdseye error:', e);
+        }
+    };
+</script>
+
+<style>
+    .birdseye-overlay {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 320px;
+        height: 420px;
+        border-radius: 12px;
+        border: 2px solid #2a2a4a;
+        overflow: hidden;
+        background: #0a0a1a;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.9);
+        z-index: 10;
+    }
+
+    .birdseye-overlay canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+</style>
+
+<script src="js/tracer.js"></script>
+
+<script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>
