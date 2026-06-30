@@ -18,9 +18,9 @@
     <div class="canvas-container">
         <canvas id="three-canvas"></canvas>
         <div class="view-toggles">
-            <button class="view-toggle active" @onclick="() => ChangeView("perspective")">Perspective</button>
-            <button class="view-toggle" @onclick="() => ChangeView("birdseye")">Top Down</button>
-            <button class="view-toggle" @onclick="() => ChangeView("behind")">Behind Ball</button>
+            <button class="view-toggle active" @onclick="@(() => ChangeView("perspective"))">Perspective</button>
+            <button class="view-toggle" @onclick="@(() => ChangeView("birdseye"))">Top Down</button>
+            <button class="view-toggle" @onclick="@(() => ChangeView("behind"))">Behind Ball</button>
         </div>
     </div>
 
@@ -36,10 +36,10 @@
 
         <div class="input-row">
             <div class="input-group">
-                <label>Launch Angle (°)</label>
+                <label>Launch Angle (&deg;)</label>
                 <input type="range" min="5" max="40" step="0.5" 
                        @bind-value="launchAngle" @bind-value:event="oninput" />
-                <span class="value-display">@launchAngle°</span>
+                <span class="value-display">@launchAngle&deg;</span>
             </div>
             <div class="input-group">
                 <label>Spin Rate (rpm)</label>
@@ -74,8 +74,12 @@
                 </div>
                 <div class="data-card">
                     <h3>Lateral</h3>
-                    <span class="value" style="color: @(result.LateralDeviation < 0 ? "#ff4455" : "#00ff88")">
-                        @(result.LateralDeviation < 0 ? "L " : "R ")@Math.Abs(result.LateralDeviation).ToString("F1")
+                    @{
+                        var latColor = result.LateralDeviation < 0 ? "#ff4455" : "#00ff88";
+                        var latDir = result.LateralDeviation < 0 ? "L " : "R ";
+                    }
+                    <span class="value" style="color: @latColor">
+                        @latDir@Math.Abs(result.LateralDeviation).ToString("F1")
                     </span>
                     <span class="unit">yds</span>
                 </div>
@@ -114,7 +118,11 @@
         // Send to JavaScript for visualization
         var jsonData = new
         {
-            trajectory = result.Trajectory.Select(p => new { x = p.X / 0.9144, y = p.Y / 0.3048, z = p.Z / 0.9144 }),
+            trajectory = result.Trajectory.Select(p => new { 
+                x = p.X / 0.9144, 
+                y = p.Y / 0.3048, 
+                z = p.Z / 0.9144 
+            }),
             carry = result.Carry,
             lateralDeviation = result.LateralDeviation
         };
